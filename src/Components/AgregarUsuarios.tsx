@@ -7,18 +7,12 @@ import {
     Alert,
     Typography,
     CircularProgress,
-    Divider,
     Grid,
-    useTheme,
-    useMediaQuery,
     Card,
     CardContent,
     Avatar,
     IconButton,
-    Fade,
-    Tooltip,
 } from '@mui/material';
-import { alpha } from '@mui/material/styles';
 import PersonAddAltIcon from '@mui/icons-material/PersonAddAlt';
 import SystemUpdateAltIcon from '@mui/icons-material/SystemUpdateAlt';
 import PersonIcon from '@mui/icons-material/Person';
@@ -41,8 +35,6 @@ interface Props {
 }
 
 const AgregarUsuarios: React.FC<Props> = ({ userToEdit, onSuccess, usersList, setUserToEdit }) => {
-    const theme = useTheme();
-    const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const [formData, setFormData] = useState({
@@ -53,7 +45,6 @@ const AgregarUsuarios: React.FC<Props> = ({ userToEdit, onSuccess, usersList, se
 
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string>('');
-    const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
     const [alert, setAlert] = useState<{ open: boolean; type: 'success' | 'error' | 'info'; message: string }>({
         open: false,
@@ -62,7 +53,6 @@ const AgregarUsuarios: React.FC<Props> = ({ userToEdit, onSuccess, usersList, se
     });
 
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [focusedField, setFocusedField] = useState<string | null>(null);
 
     useEffect(() => {
         if (userToEdit) {
@@ -72,7 +62,6 @@ const AgregarUsuarios: React.FC<Props> = ({ userToEdit, onSuccess, usersList, se
                 foto: userToEdit.foto,
             });
             
-            // Si hay una foto existente, mostrarla
             if (userToEdit.foto) {
                 setPreviewUrl(`http://localhost:8000${userToEdit.foto}`);
             }
@@ -85,14 +74,6 @@ const AgregarUsuarios: React.FC<Props> = ({ userToEdit, onSuccess, usersList, se
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
-    };
-
-    const handleFocus = (fieldName: string) => {
-        setFocusedField(fieldName);
-    };
-
-    const handleBlur = () => {
-        setFocusedField(null);
     };
 
     const handleCloseAlert = () => {
@@ -111,98 +92,35 @@ const AgregarUsuarios: React.FC<Props> = ({ userToEdit, onSuccess, usersList, se
 
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (file) {
-            // Validar tipo de archivo
-            const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-            if (!allowedTypes.includes(file.type)) {
-                setAlert({
-                    open: true,
-                    type: 'error',
-                    message: 'Solo se permiten imágenes (JPG, PNG, GIF, WebP)',
-                });
-                return;
-            }
+        if (!file) return;
 
-            // Validar tamaño (3MB máximo)
-            const maxSize = 3 * 1024 * 1024; // 3MB
-            if (file.size > maxSize) {
-                setAlert({
-                    open: true,
-                    type: 'error',
-                    message: 'El archivo es demasiado grande (máximo 3MB)',
-                });
-                return;
-            }
-
-            setSelectedFile(file);
-            
-            // Crear preview
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                setPreviewUrl(e.target?.result as string);
-            };
-            reader.readAsDataURL(file);
-        }
-    };
-
-    const handleUploadPhoto = async (): Promise<string | null> => {
-        if (!selectedFile) return null;
-
-        setIsUploadingPhoto(true);
-        
-        try {
-            const formDataUpload = new FormData();
-            formDataUpload.append('file', selectedFile);
-
-            const response = await fetch('http://localhost:8000/upload', {
-                method: 'POST',
-                body: formDataUpload,
+        // Validaciones básicas
+        if (!file.type.startsWith('image/')) {
+            setAlert({
+                open: true,
+                type: 'error',
+                message: 'Solo se permiten imágenes',
             });
-
-            if (response.ok) {
-                const result = await response.json();
-                console.log('Foto subida exitosamente:', result);
-                return result.data.url; // Devuelve la URL de la foto
-            } else {
-                const errorData = await response.json().catch(() => null);
-                throw new Error(errorData?.message || 'Error al subir la foto');
-            }
-        } catch (error: any) {
-            console.error('Error al subir foto:', error);
-            throw new Error(error.message || 'Error al subir la foto');
-        } finally {
-            setIsUploadingPhoto(false);
+            return;
         }
-    };
 
-    const handleUpdateUserPhoto = async (userId: number): Promise<string | null> => {
-        if (!selectedFile) return null;
-
-        setIsUploadingPhoto(true);
-        
-        try {
-            const formDataUpload = new FormData();
-            formDataUpload.append('file', selectedFile);
-
-            const response = await fetch(`http://localhost:8000/usuario/${userId}/foto`, {
-                method: 'PUT',
-                body: formDataUpload,
+        if (file.size > 10 * 1024 * 1024) { // 10MB
+            setAlert({
+                open: true,
+                type: 'error',
+                message: 'Imagen demasiado grande (máx 10MB)',
             });
-
-            if (response.ok) {
-                const result = await response.json();
-                console.log('Foto actualizada exitosamente:', result);
-                return result.data.fotoNueva; // Devuelve la URL de la nueva foto
-            } else {
-                const errorData = await response.json().catch(() => null);
-                throw new Error(errorData?.message || 'Error al actualizar la foto');
-            }
-        } catch (error: any) {
-            console.error('Error al actualizar foto:', error);
-            throw new Error(error.message || 'Error al actualizar la foto');
-        } finally {
-            setIsUploadingPhoto(false);
+            return;
         }
+
+        setSelectedFile(file);
+        
+        // Preview inmediato
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            setPreviewUrl(e.target?.result as string);
+        };
+        reader.readAsDataURL(file);
     };
 
     const handleRemovePhoto = () => {
@@ -233,38 +151,115 @@ const AgregarUsuarios: React.FC<Props> = ({ userToEdit, onSuccess, usersList, se
         return true;
     };
 
+    // Función específica para subir imagen nueva
+    const uploadNewImage = async (file: File): Promise<string> => {
+        console.log('🔄 Subiendo imagen nueva...');
+        
+        const formDataUpload = new FormData();
+        formDataUpload.append('file', file);
+
+        const response = await fetch('http://localhost:8000/upload', {
+            method: 'POST',
+            body: formDataUpload,
+        });
+
+        console.log('📤 Respuesta upload status:', response.status);
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('❌ Error response:', errorText);
+            throw new Error(`Error ${response.status}: ${errorText}`);
+        }
+
+        const result = await response.json();
+        console.log('✅ Upload result:', result);
+
+        // Manejar diferentes estructuras de respuesta del backend
+        if (result.success && result.data && result.data.url) {
+            return result.data.url;
+        } else if (result.url) {
+            return result.url;
+        } else if (result.data && result.data.filePath) {
+            return result.data.filePath.replace('./uploads', '/uploads');
+        } else {
+            console.error('⚠️ Estructura de respuesta inesperada:', result);
+            throw new Error('Respuesta del servidor inválida');
+        }
+    };
+
+    // Función específica para actualizar imagen de usuario existente
+    const updateUserImage = async (userId: number, file: File): Promise<string> => {
+        console.log('🔄 Actualizando imagen de usuario:', userId);
+        
+        const formDataUpload = new FormData();
+        formDataUpload.append('file', file);
+
+        const response = await fetch(`http://localhost:8000/usuario/${userId}/foto`, {
+            method: 'PUT',
+            body: formDataUpload,
+        });
+
+        console.log('📤 Respuesta update status:', response.status);
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('❌ Error response:', errorText);
+            throw new Error(`Error ${response.status}: ${errorText}`);
+        }
+
+        const result = await response.json();
+        console.log('✅ Update result:', result);
+
+        // Manejar diferentes estructuras de respuesta
+        if (result.success && result.data && result.data.fotoNueva) {
+            return result.data.fotoNueva;
+        } else if (result.fotoNueva) {
+            return result.fotoNueva;
+        } else if (result.data && result.data.url) {
+            return result.data.url;
+        } else {
+            console.error('⚠️ Estructura de respuesta inesperada:', result);
+            throw new Error('Respuesta del servidor inválida');
+        }
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
         if (!validateForm()) return;
 
         setIsSubmitting(true);
-        console.log("Datos que se van a enviar", formData);
+        console.log('🚀 Iniciando envío del formulario...');
 
         try {
             let fotoUrl = formData.foto; // URL existente por defecto
 
-            // Si hay una nueva foto seleccionada, subirla primero
+            // Solo subir imagen si hay una nueva seleccionada
             if (selectedFile) {
+                console.log('📷 Procesando imagen seleccionada...');
+                
                 try {
-                    if (userToEdit) {
-                        // Actualizar foto de usuario existente
-                        fotoUrl = await handleUpdateUserPhoto(userToEdit.idUsuario!);
+                    if (userToEdit && userToEdit.idUsuario) {
+                        // Actualizar imagen de usuario existente
+                        fotoUrl = await updateUserImage(userToEdit.idUsuario, selectedFile);
+                        console.log('✅ Imagen actualizada:', fotoUrl);
                     } else {
-                        // Subir nueva foto
-                        fotoUrl = await handleUploadPhoto();
+                        // Subir nueva imagen
+                        fotoUrl = await uploadNewImage(selectedFile);
+                        console.log('✅ Imagen subida:', fotoUrl);
                     }
-                } catch (photoError: any) {
+                } catch (imageError: any) {
+                    console.error('❌ Error procesando imagen:', imageError);
                     setAlert({
                         open: true,
                         type: 'error',
-                        message: photoError.message,
+                        message: `Error al procesar imagen: ${imageError.message}`,
                     });
                     return;
                 }
             }
 
-            // Solo proceder si tenemos una foto (nueva o existente)
+            // Validar que tenemos foto para nuevos usuarios
             if (!fotoUrl && !userToEdit) {
                 setAlert({
                     open: true,
@@ -274,21 +269,24 @@ const AgregarUsuarios: React.FC<Props> = ({ userToEdit, onSuccess, usersList, se
                 return;
             }
 
+            console.log('💾 Guardando usuario con foto:', fotoUrl);
+
+            // Guardar/actualizar usuario
             const url = 'http://localhost:8000/usuario';
             const method = userToEdit ? 'PUT' : 'POST';
 
             const payload = userToEdit ? {
                 idUsuario: userToEdit.idUsuario,
-                nombre: formData.nombre,
-                apellido: formData.apellido,
-                foto: fotoUrl || formData.foto,
+                nombre: formData.nombre.trim(),
+                apellido: formData.apellido.trim(),
+                foto: fotoUrl,
             } : {
-                nombre: formData.nombre,
-                apellido: formData.apellido,
+                nombre: formData.nombre.trim(),
+                apellido: formData.apellido.trim(),
                 foto: fotoUrl,
             };
 
-            console.log('Payload enviado:', payload);
+            console.log('📤 Enviando payload:', payload);
 
             const response = await fetch(url, {
                 method,
@@ -296,46 +294,30 @@ const AgregarUsuarios: React.FC<Props> = ({ userToEdit, onSuccess, usersList, se
                 body: JSON.stringify(payload),
             });
 
-            console.log('Response status:', response.status);
-            
+            console.log('📥 Usuario response status:', response.status);
+
             if (response.ok) {
-                let responseData;
-                try {
-                    responseData = await response.json();
-                } catch {
-                    responseData = { success: true };
-                }
-                console.log('Response data:', responseData);
+                const result = await response.json();
+                console.log('✅ Usuario guardado:', result);
                 
                 setAlert({
                     open: true,
                     type: 'success',
-                    message: userToEdit
-                        ? `¡Usuario ${formData.nombre} actualizado exitosamente!`
-                        : `¡Usuario ${formData.nombre} creado exitosamente!`,
+                    message: `Usuario ${formData.nombre} ${userToEdit ? 'actualizado' : 'creado'} exitosamente`,
                 });
                 onSuccess();
                 resetForm();
             } else {
-                const errorData = await response.json().catch(() => null);
-                console.error('Error response:', errorData);
-                throw new Error(errorData?.message || `Error ${response.status}: ${response.statusText}`);
+                const errorText = await response.text();
+                console.error('❌ Error guardando usuario:', errorText);
+                throw new Error(`Error ${response.status}: Usuario no pudo ser guardado`);
             }
         } catch (err: any) {
-            console.error('Error completo:', err);
-            
-            let errorMessage = 'Ocurrió un error al guardar el usuario';
-            
-            if (err.name === 'TypeError' && err.message.includes('fetch')) {
-                errorMessage = 'Error de conexión. Verifique que el servidor esté ejecutándose.';
-            } else if (err.message) {
-                errorMessage = err.message;
-            }
-            
+            console.error('❌ Error completo:', err);
             setAlert({
                 open: true,
                 type: 'error',
-                message: errorMessage,
+                message: err.message || 'Error al guardar usuario',
             });
         } finally {
             setIsSubmitting(false);
@@ -343,211 +325,116 @@ const AgregarUsuarios: React.FC<Props> = ({ userToEdit, onSuccess, usersList, se
     };
 
     return (
-        <Fade in={true} timeout={500}>
-            <Card
-                elevation={4}
-                sx={{
-                    borderRadius: 3,
-                    overflow: 'visible',
-                    backgroundColor: theme.palette.background.paper,
-                    boxShadow: `0 10px 40px -10px ${alpha(theme.palette.primary.main, 0.2)}`,
-                    position: 'relative',
-                }}
-            >
-                <CardContent sx={{ p: { xs: 2, sm: 4 } }}>
-                    <Box component="form" onSubmit={handleSubmit} noValidate>
-                        <Box display="flex" alignItems="center" justifyContent="center" mb={3}>
-                            <Typography
-                                variant="h5"
-                                fontWeight="600"
+        <Card elevation={2} sx={{ borderRadius: 2 }}>
+            <CardContent sx={{ p: 3 }}>
+                <Typography variant="h6" gutterBottom textAlign="center" color="primary">
+                    {userToEdit ? 'Actualizar Usuario' : 'Nuevo Usuario'}
+                </Typography>
+
+                <Box component="form" onSubmit={handleSubmit} noValidate>
+                    {/* Sección de foto */}
+                    <Box display="flex" flexDirection="column" alignItems="center" mb={3}>
+                        <Avatar
+                            src={previewUrl}
+                            sx={{ width: 80, height: 80, mb: 1 }}
+                        >
+                            <PersonIcon sx={{ fontSize: 40 }} />
+                        </Avatar>
+
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            onChange={handleFileSelect}
+                            style={{ display: 'none' }}
+                        />
+
+                        <Box display="flex" gap={1}>
+                            <IconButton
                                 color="primary"
-                                sx={{ letterSpacing: '0.5px' }}
+                                onClick={() => fileInputRef.current?.click()}
+                                disabled={isSubmitting}
+                                size="small"
                             >
-                                {userToEdit ? 'Actualizar Usuario' : 'Registro de Usuario'}
-                            </Typography>
-                        </Box>
+                                <PhotoCameraIcon />
+                            </IconButton>
 
-                        <Divider sx={{ mb: 4 }} />
-
-                        {/* Sección de foto */}
-                        <Box display="flex" justifyContent="center" mb={4}>
-                            <Box textAlign="center">
-                                <Avatar
-                                    src={previewUrl}
-                                    sx={{
-                                        width: 120,
-                                        height: 120,
-                                        mx: 'auto',
-                                        mb: 2,
-                                        border: `3px solid ${theme.palette.primary.main}`,
-                                        boxShadow: `0 4px 20px ${alpha(theme.palette.primary.main, 0.3)}`,
-                                    }}
+                            {previewUrl && (
+                                <IconButton
+                                    color="error"
+                                    onClick={handleRemovePhoto}
+                                    disabled={isSubmitting}
+                                    size="small"
                                 >
-                                    <PersonIcon sx={{ fontSize: 60 }} />
-                                </Avatar>
-
-                                <input
-                                    ref={fileInputRef}
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={handleFileSelect}
-                                    style={{ display: 'none' }}
-                                />
-
-                                <Box display="flex" gap={1} justifyContent="center">
-                                    <Tooltip title="Seleccionar foto">
-                                        <IconButton
-                                            color="primary"
-                                            onClick={() => fileInputRef.current?.click()}
-                                            disabled={isUploadingPhoto}
-                                        >
-                                            <PhotoCameraIcon />
-                                        </IconButton>
-                                    </Tooltip>
-
-                                    {(previewUrl || selectedFile) && (
-                                        <Tooltip title="Quitar foto">
-                                            <IconButton
-                                                color="error"
-                                                onClick={handleRemovePhoto}
-                                                disabled={isUploadingPhoto}
-                                            >
-                                                <DeleteIcon />
-                                            </IconButton>
-                                        </Tooltip>
-                                    )}
-                                </Box>
-
-                                {selectedFile && (
-                                    <Typography variant="caption" color="textSecondary" display="block">
-                                        {selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
-                                    </Typography>
-                                )}
-
-                                {isUploadingPhoto && (
-                                    <Box display="flex" alignItems="center" justifyContent="center" mt={1}>
-                                        <CircularProgress size={20} sx={{ mr: 1 }} />
-                                        <Typography variant="caption">Subiendo foto...</Typography>
-                                    </Box>
-                                )}
-                            </Box>
+                                    <DeleteIcon />
+                                </IconButton>
+                            )}
                         </Box>
 
-                        <Grid container spacing={3}>
-                            <Grid item xs={12} md={6}>
-                                <TextField
-                                    name="nombre"
-                                    label="Nombre"
-                                    value={formData.nombre}
-                                    onChange={handleChange}
-                                    onFocus={() => handleFocus('nombre')}
-                                    onBlur={handleBlur}
-                                    variant="outlined"
-                                    fullWidth
-                                    required
-                                    InputProps={{
-                                        startAdornment: (
-                                            <PersonIcon
-                                                color={focusedField === 'nombre' ? 'primary' : 'action'}
-                                                sx={{ mr: 1 }}
-                                            />
-                                        ),
-                                    }}
-                                    sx={{
-                                        '& .MuiOutlinedInput-root': {
-                                            borderRadius: 2,
-                                            transition: theme.transitions.create(['box-shadow']),
-                                            ...(focusedField === 'nombre' && {
-                                                boxShadow: `0 0 0 3px ${alpha(theme.palette.primary.main, 0.2)}`
-                                            })
-                                        }
-                                    }}
-                                />
-                            </Grid>
+                        {selectedFile && (
+                            <Typography variant="caption" color="textSecondary" textAlign="center">
+                                {selectedFile.name} ({(selectedFile.size / 1024).toFixed(0)} KB)
+                            </Typography>
+                        )}
+                    </Box>
 
-                            <Grid item xs={12} md={6}>
-                                <TextField
-                                    name="apellido"
-                                    label="Apellido"
-                                    value={formData.apellido}
-                                    onChange={handleChange}
-                                    onFocus={() => handleFocus('apellido')}
-                                    onBlur={handleBlur}
-                                    variant="outlined"
-                                    fullWidth
-                                    required
-                                    InputProps={{
-                                        startAdornment: (
-                                            <BadgeIcon
-                                                color={focusedField === 'apellido' ? 'primary' : 'action'}
-                                                sx={{ mr: 1 }}
-                                            />
-                                        ),
-                                    }}
-                                    sx={{
-                                        '& .MuiOutlinedInput-root': {
-                                            borderRadius: 2,
-                                            transition: theme.transitions.create(['box-shadow']),
-                                            ...(focusedField === 'apellido' && {
-                                                boxShadow: `0 0 0 3px ${alpha(theme.palette.primary.main, 0.2)}`
-                                            })
-                                        }
-                                    }}
-                                />
-                            </Grid>
+                    <Grid container spacing={2}>
+                        <Grid item xs={12} sm={6}>
+                            <TextField
+                                name="nombre"
+                                label="Nombre"
+                                value={formData.nombre}
+                                onChange={handleChange}
+                                variant="outlined"
+                                fullWidth
+                                required
+                                size="small"
+                                InputProps={{
+                                    startAdornment: <PersonIcon sx={{ mr: 1, color: 'action.active' }} />,
+                                }}
+                            />
                         </Grid>
 
-                        <Box
-                            sx={{
-                                display: 'flex',
-                                justifyContent: 'center',
-                                mt: 4,
-                                '& .MuiButton-root': {
-                                    borderRadius: 2,
-                                    py: 1.5,
-                                    px: 4,
-                                    fontWeight: 500,
-                                    letterSpacing: '0.5px',
-                                    transition: 'transform 0.2s, box-shadow 0.2s',
-                                    '&:hover:not(:disabled)': {
-                                        transform: 'translateY(-2px)',
-                                        boxShadow: `0 6px 20px -5px ${alpha(theme.palette.primary.main, 0.4)}`
-                                    }
-                                }
-                            }}
+                        <Grid item xs={12} sm={6}>
+                            <TextField
+                                name="apellido"
+                                label="Apellido"
+                                value={formData.apellido}
+                                onChange={handleChange}
+                                variant="outlined"
+                                fullWidth
+                                required
+                                size="small"
+                                InputProps={{
+                                    startAdornment: <BadgeIcon sx={{ mr: 1, color: 'action.active' }} />,
+                                }}
+                            />
+                        </Grid>
+                    </Grid>
+
+                    <Box display="flex" justifyContent="center" mt={3}>
+                        <Button
+                            type="submit"
+                            variant="contained"
+                            disabled={isSubmitting}
+                            startIcon={userToEdit ? <SystemUpdateAltIcon /> : <PersonAddAltIcon />}
+                            sx={{ minWidth: 160 }}
                         >
-                            <Tooltip title={userToEdit ? "Guardar cambios del usuario" : "Registrar nuevo usuario"}>
-                                <Button
-                                    type="submit"
-                                    variant="contained"
-                                    color="primary"
-                                    disabled={isSubmitting || isUploadingPhoto}
-                                    startIcon={userToEdit ? <SystemUpdateAltIcon /> : <PersonAddAltIcon />}
-                                    sx={{
-                                        backgroundColor: theme.palette.primary.main,
-                                        boxShadow: `0 4px 14px ${alpha(theme.palette.primary.main, 0.4)}`,
-                                        '&:hover': {
-                                            backgroundColor: theme.palette.primary.dark,
-                                        }
-                                    }}
-                                >
-                                    {isSubmitting || isUploadingPhoto ? (
-                                        <>
-                                            <CircularProgress size={24} color="inherit" sx={{ mr: 1 }} />
-                                            {isUploadingPhoto ? 'Subiendo foto...' : (userToEdit ? 'Actualizando...' : 'Registrando...')}
-                                        </>
-                                    ) : (
-                                        userToEdit ? 'Actualizar Usuario' : 'Registrar Usuario'
-                                    )}
-                                </Button>
-                            </Tooltip>
-                        </Box>
+                            {isSubmitting ? (
+                                <>
+                                    <CircularProgress size={20} color="inherit" sx={{ mr: 1 }} />
+                                    Guardando...
+                                </>
+                            ) : (
+                                userToEdit ? 'Actualizar' : 'Guardar'
+                            )}
+                        </Button>
                     </Box>
-                </CardContent>
+                </Box>
 
                 <Snackbar
                     open={alert.open}
-                    autoHideDuration={6000}
+                    autoHideDuration={3000}
                     onClose={handleCloseAlert}
                     anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
                 >
@@ -555,8 +442,8 @@ const AgregarUsuarios: React.FC<Props> = ({ userToEdit, onSuccess, usersList, se
                         {alert.message}
                     </Alert>
                 </Snackbar>
-            </Card>
-        </Fade>
+            </CardContent>
+        </Card>
     );
 };
 
